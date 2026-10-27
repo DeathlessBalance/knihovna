@@ -70,6 +70,8 @@ function resolveUser() {
 
 function showLogin() {
   $('#login').hidden = false;
+  // Osobní odkaz vložený do už otevřené stránky nezpůsobí její znovunačtení.
+  window.addEventListener('hashchange', () => location.reload());
   $('#login-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const user = userByCode($('#login-code').value);
