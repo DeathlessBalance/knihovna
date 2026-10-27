@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Knihovna</title>
+  <meta name="theme-color" content="#24150f">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Knihovna">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <section id="login" class="login" hidden>
+    <div class="login-card">
+      <div class="crest">❦</div>
+      <h1>Knihovna</h1>
+      <p>Zadej svůj osobní kód</p>
+      <form id="login-form">
+        <input id="login-code" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="kód">
+        <button class="btn btn-gold" type="submit">Vstoupit</button>
+      </form>
+      <p id="login-error" class="error" hidden>Tenhle kód neznám.</p>
+    </div>
+  </section>
+
+  <div id="app" hidden>
+    <header class="top">
+      <div class="brand"><span class="crest">❦</span><h1>Knihovna</h1></div>
+      <nav id="people" class="people" aria-label="Čí knihovna"></nav>
+      <button id="logout" class="link-btn" type="button">Odhlásit</button>
+    </header>
+
+    <div class="wrap">
+      <p id="demo-banner" class="banner" hidden>Zkušební režim – data se ukládají jen v tomto prohlížeči a ukázkové knihy jsou smyšlené.</p>
+      <nav id="tabs" class="tabs" aria-label="Záložky"></nav>
+      <section class="toolbar">
+        <input id="search" type="search" placeholder="Hledat název, autora, sérii…" aria-label="Hledat">
+        <select id="sort" aria-label="Řazení">
+          <option value="added">Naposledy přidané</option>
+          <option value="title">Podle názvu</option>
+          <option value="author">Podle autora</option>
+          <option value="year">Podle roku vydání</option>
+          <option value="rating">Podle hodnocení</option>
+          <option value="series">Podle sérií</option>
+        </select>
+        <select id="genre-filter" aria-label="Žánr"></select>
+        <select id="status-filter" aria-label="Stav čtení"></select>
+        <label id="lent-wrap" class="check"><input id="lent-only" type="checkbox"> Jen půjčené</label>
+      </section>
+      <main id="list" class="list"></main>
+    </div>
+
+    <button id="add-btn" class="fab" type="button" aria-label="Přidat titul">+</button>
+  </div>
+
+  <dialog id="modal" class="modal"><div id="modal-body"></div></dialog>
+  <div id="toast" class="toast" popover="manual" hidden></div>
+
+  <script src="config.js"></script>
+  <script src="utils.js"></script>
+  <script src="store.js"></script>
+  <script src="lookup.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
