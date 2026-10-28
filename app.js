@@ -427,7 +427,6 @@ function openForm(book = null) {
     </div>
     <form id="book-form" class="book-form" autocomplete="off">
       <div id="cover-preview" class="cover-preview"></div>
-      <input type="hidden" name="cover" value="${esc(b.cover)}">
       <input type="hidden" name="isbn" value="${esc(b.isbn)}">
       ${field('Název *', `<input name="title" required value="${esc(b.title)}">`, 'full')}
       ${field('Autor', `<input name="author" value="${esc(b.author)}">`, 'full')}
@@ -437,6 +436,7 @@ function openForm(book = null) {
       ${field('Díl', `<input name="seriesNo" type="number" min="0" step="1" inputmode="numeric" value="${esc(b.seriesNo)}">`)}
       ${field('Rok vydání', `<input name="year" type="number" min="0" max="2100" inputmode="numeric" value="${esc(b.year)}">`)}
       ${field('Stav čtení', select('status', STATUSES, b.status || 'neprecteno'), 'status-field')}
+      ${field('Odkaz na obálku', `<input name="cover" type="url" inputmode="url" value="${esc(b.cover)}" placeholder="Pravým klikem na obálku → Kopírovat adresu obrázku">`, 'full')}
       <div id="dup-warning" class="warning" hidden></div>
       <div class="form-actions">
         <button type="button" class="btn ghost" data-action="close">Zrušit</button>
@@ -501,11 +501,14 @@ function setCover(url) {
 
 function renderCoverPreview() {
   const box = modalBody.querySelector('#cover-preview');
-  const url = formEl('cover').value;
+  const url = formEl('cover').value.trim();
   box.hidden = !url;
   box.innerHTML = url
     ? `<img src="${esc(url)}" alt="Obálka" referrerpolicy="no-referrer"><button type="button" class="btn ghost" data-action="remove-cover">Odebrat obálku</button>`
     : '';
+  box.querySelector('img')?.addEventListener('error', (e) => {
+    e.target.outerHTML = '<span class="muted">Obrázek se nepodařilo načíst – zkontroluj, že je to odkaz přímo na obrázek.</span>';
+  });
 }
 
 async function runLookup() {
@@ -646,6 +649,7 @@ function onModalInput(e) {
     modalBody.querySelector('#lend-other').hidden = e.target.value !== '__other';
     return;
   }
+  if (e.target.name === 'cover') renderCoverPreview();
   if (e.target.closest('#book-form')) syncFormState();
 }
 

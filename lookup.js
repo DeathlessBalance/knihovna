@@ -8,6 +8,8 @@ const GENRE_HINTS = [
   ['Komiks/Manga', /comic|manga|graphic novel/i],
   ['Poezie', /poetry|poems/i],
   ['Horor', /horror/i],
+  ['Erotický román', /erotic/i],
+  ['Romantasy', /romantasy|fantasy romance|romance \/ fantasy|romantic fantasy|paranormal romance/i],
   ['Sci-fi', /science fiction|sci-fi|dystopi/i],
   ['Fantasy', /fantasy|magic|dragons/i],
   ['Romantika', /romance|love stor/i],
