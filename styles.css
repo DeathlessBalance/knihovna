@@ -418,6 +418,9 @@ input:focus, select:focus, button:focus-visible, .card:focus-visible {
 .field { display: flex; flex-direction: column; }
 .field.full, .cover-preview, .warning, .form-actions { grid-column: 1 / -1; }
 .cover-preview { display: flex; align-items: center; gap: 0.75rem; }
+.cover-row { display: flex; gap: 0.5rem; }
+.cover-row .btn { flex: none; cursor: pointer; }
+.cover-row input { flex: 1; min-width: 0; }
 .cover-preview img { width: 60px; height: 90px; border: 1px solid var(--line); border-radius: 4px; object-fit: cover; }
 .warning {
   padding: 0.6rem 0.8rem;

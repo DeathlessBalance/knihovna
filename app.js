@@ -427,6 +427,7 @@ function openForm(book = null) {
     </div>
     <form id="book-form" class="book-form" autocomplete="off">
       <div id="cover-preview" class="cover-preview"></div>
+      <input type="hidden" name="cover" value="${esc(b.cover)}">
       <input type="hidden" name="isbn" value="${esc(b.isbn)}">
       ${field('Název *', `<input name="title" required value="${esc(b.title)}">`, 'full')}
       ${field('Autor', `<input name="author" value="${esc(b.author)}">`, 'full')}
@@ -436,7 +437,13 @@ function openForm(book = null) {
       ${field('Díl', `<input name="seriesNo" type="number" min="0" step="1" inputmode="numeric" value="${esc(b.seriesNo)}">`)}
       ${field('Rok vydání', `<input name="year" type="number" min="0" max="2100" inputmode="numeric" value="${esc(b.year)}">`)}
       ${field('Stav čtení', select('status', STATUSES, b.status || 'neprecteno'), 'status-field')}
-      ${field('Odkaz na obálku', `<input name="cover" type="url" inputmode="url" value="${esc(b.cover)}" placeholder="Pravým klikem na obálku → Kopírovat adresu obrázku">`, 'full')}
+      <div class="field full">
+        <span>Obálka</span>
+        <div class="cover-row">
+          <label class="btn">📷 Z galerie<input id="cover-file" type="file" accept="image/*" hidden></label>
+          <input id="cover-url" type="url" inputmode="url" value="${esc(isDataUrl(b.cover) ? '' : b.cover)}" placeholder="…nebo vlož odkaz na obrázek" aria-label="Odkaz na obálku">
+        </div>
+      </div>
       <div id="dup-warning" class="warning" hidden></div>
       <div class="form-actions">
         <button type="button" class="btn ghost" data-action="close">Zrušit</button>
@@ -494,9 +501,48 @@ function duplicateMessage(data, editingId) {
   return msgs.join('<br>');
 }
 
+const isDataUrl = (url) => String(url || '').startsWith('data:');
+
 function setCover(url) {
   formEl('cover').value = url || '';
+  modalBody.querySelector('#cover-url').value = isDataUrl(url) ? '' : url || '';
   renderCoverPreview();
+}
+
+// Fotka z galerie se zmenší a uloží přímo k titulu, ať v databázi nezabírá moc místa.
+function shrinkImage(file, maxWidth = 360, maxHeight = 540) {
+  return new Promise((resolve, reject) => {
+    const src = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(src);
+      const scale = Math.min(1, maxWidth / img.naturalWidth, maxHeight / img.naturalHeight);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.8));
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(src);
+      reject(new Error('Tenhle obrázek se nepodařilo načíst.'));
+    };
+    img.src = src;
+  });
+}
+
+async function onCoverFile(input) {
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  try {
+    setCover(await shrinkImage(file));
+  } catch (err) {
+    toast(err.message);
+  }
 }
 
 function renderCoverPreview() {
@@ -649,7 +695,14 @@ function onModalInput(e) {
     modalBody.querySelector('#lend-other').hidden = e.target.value !== '__other';
     return;
   }
-  if (e.target.name === 'cover') renderCoverPreview();
+  if (e.target.id === 'cover-file') {
+    if (e.type === 'change') onCoverFile(e.target);
+    return;
+  }
+  if (e.target.id === 'cover-url') {
+    formEl('cover').value = e.target.value.trim();
+    renderCoverPreview();
+  }
   if (e.target.closest('#book-form')) syncFormState();
 }
 
