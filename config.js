@@ -27,7 +27,7 @@ const GENRES = [
 
 // Klíč pro Google Books (zdarma, viz NAVOD.md). Bez něj vyhledávání často hlásí
 // vyčerpaný limit a české knihy pak hledá jen Open Library, která jich moc nezná.
-const GOOGLE_BOOKS_API_KEY = '';
+const GOOGLE_BOOKS_API_KEY = 'AIzaSyDXDYz29bkJSij5iRghuNr5313jDRiA6U4';
 
 // Dokud je tu null, běží aplikace ve zkušebním režimu (data jen v tomto prohlížeči).
 // Po založení projektu ve Firebase sem vlož jeho konfiguraci (viz NAVOD.md), např.:
