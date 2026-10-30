@@ -6,6 +6,7 @@ const TYPES = {
   wishlist: { label: 'Wishlist', one: 'Wishlist', icon: '⭐', where: 'na Wishlistu' },
 };
 const STATUSES = { neprecteno: 'Nepřečteno', ctu: 'Čtu', precteno: 'Přečteno' };
+const MONTHS = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen', 'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
 const EMPTY_MINE = {
   kniha: 'Tvoje polička je zatím prázdná.',
   ekniha: 'Zatím tu nemáš žádné e-knihy.',
@@ -122,6 +123,7 @@ function avgRating(book) {
 }
 const formatAvg = (v) => v.toLocaleString('cs-CZ', { maximumFractionDigits: 1 });
 const starsText = (v) => '★'.repeat(Math.round(v)) + '☆'.repeat(5 - Math.round(v));
+const releaseText = (book) => [MONTHS[book.month - 1], book.year].filter(Boolean).join(' ');
 const listNames = (names) => esc(names.join(' a '));
 
 function sameBook(a, b) {
@@ -214,7 +216,7 @@ function sortBooks(list) {
     added: (a, b) => (b.createdAt || 0) - (a.createdAt || 0),
     title: (a, b) => collator.compare(text(a.title), text(b.title)),
     author: (a, b) => collator.compare(text(a.author), text(b.author)) || collator.compare(text(a.title), text(b.title)),
-    year: (a, b) => (b.year || 0) - (a.year || 0),
+    year: (a, b) => (b.year || 0) - (a.year || 0) || (b.month || 0) - (a.month || 0),
     rating: (a, b) => (avgRating(b) ?? -1) - (avgRating(a) ?? -1),
     series: (a, b) => collator.compare(text(a.series), text(b.series)) || (a.seriesNo || 0) - (b.seriesNo || 0),
   };
@@ -291,7 +293,7 @@ function card(book) {
       <h3 class="title">${esc(book.title)}</h3>
       ${book.author ? `<p class="author">${esc(book.author)}</p>` : ''}
       ${book.series ? `<p class="series">${esc(book.series)}${book.seriesNo ? ` · díl ${esc(book.seriesNo)}` : ''}</p>` : ''}
-      <p class="meta">${[book.genre, book.year].filter(Boolean).map(esc).join(' · ')}</p>
+      <p class="meta">${[book.genre, releaseText(book)].filter(Boolean).map(esc).join(' · ')}</p>
       ${avg != null ? `<p class="stars-sm">${starsText(avg)} <span>${formatAvg(avg)}</span></p>` : ''}
       <div class="badges">${badges.join('')}</div>
     </div>
@@ -317,7 +319,7 @@ function renderDetail() {
   const facts = [
     ['Série', book.series ? esc(book.series) + (book.seriesNo ? `, díl ${esc(book.seriesNo)}` : '') : ''],
     ['Žánr', esc(book.genre)],
-    ['Rok vydání', esc(book.year)],
+    ['Vydání', esc(releaseText(book))],
     ['ISBN', esc(book.isbn)],
   ].filter(([, v]) => v);
 
@@ -335,7 +337,7 @@ function renderDetail() {
     </div>
     ${book.type !== 'wishlist' ? statusSection(book, own) + ratingSection(book) : ''}
     ${book.type === 'kniha' ? lendSection(book, own) : ''}
-    ${own ? actionsSection(book) : ''}`;
+    ${own ? actionsSection(book) : ownTooSection(book)}`;
 }
 
 function statusSection(book, own) {
@@ -393,6 +395,31 @@ function actionsSection(book) {
   </div>`;
 }
 
+// Moje kopie stejného titulu (v jakékoliv záložce).
+const myCopies = (book) => state.books.filter((x) => x.owner === state.me && sameBook(x, book));
+
+function ownTooSection(book) {
+  if (book.type === 'wishlist') return '';
+  const have = myCopies(book).map((x) => x.type);
+  const buttons = ['kniha', 'ekniha']
+    .filter((type) => !have.includes(type))
+    .map((type) => `<button type="button" class="btn btn-gold" data-action="own-too" data-value="${type}">${TYPES[type].icon} Mám také – ${TYPES[type].one.toLowerCase()}</button>`);
+  return buttons.length ? `<div class="actions">${buttons.join('')}</div>` : '';
+}
+
+// Titul z cizí knihovny se zkopíruje k přihlášené; když ho má na wishlistu, přesune se odtamtud.
+async function addOwnCopy(book, type) {
+  const wished = myCopies(book).find((x) => x.type === 'wishlist');
+  if (wished) {
+    await store.update(wished.id, { type, status: 'neprecteno' });
+    return;
+  }
+  const copy = Object.fromEntries(
+    ['title', 'author', 'genre', 'series', 'seriesNo', 'year', 'month', 'isbn', 'cover'].map((k) => [k, book[k] ?? null]),
+  );
+  await store.add({ ...copy, type, status: 'neprecteno', owner: state.me, ratings: {}, lentTo: null, lentSince: null });
+}
+
 // ---------- Formulář přidání / úpravy ----------
 
 function field(label, control, className = '') {
@@ -413,6 +440,7 @@ function openForm(book = null) {
 
   const typeOptions = Object.fromEntries(Object.entries(TYPES).map(([k, t]) => [k, t.label]));
   const genreOptions = { '': '— vyber —', ...Object.fromEntries(GENRES.map((g) => [g, g])) };
+  const monthOptions = { '': '— nevím —', ...Object.fromEntries(MONTHS.map((m, i) => [i + 1, m])) };
 
   modalBody.innerHTML = `
     <button type="button" class="close" data-action="close" aria-label="Zavřít">×</button>
@@ -436,6 +464,7 @@ function openForm(book = null) {
       ${field('Série', `<input name="series" value="${esc(b.series)}" placeholder="např. Zaklínač">`)}
       ${field('Díl', `<input name="seriesNo" type="number" min="0" step="1" inputmode="numeric" value="${esc(b.seriesNo)}">`)}
       ${field('Rok vydání', `<input name="year" type="number" min="0" max="2100" inputmode="numeric" value="${esc(b.year)}">`)}
+      ${field('Měsíc vydání', select('month', monthOptions, b.month))}
       ${field('Stav čtení', select('status', STATUSES, b.status || 'neprecteno'), 'status-field')}
       <div class="field full">
         <span>Obálka</span>
@@ -471,6 +500,7 @@ function formData() {
     series: get('series') || null,
     seriesNo: num('seriesNo'),
     year: num('year'),
+    month: num('month'),
     status: get('status'),
     cover: get('cover') || null,
     isbn: get('isbn') || null,
@@ -589,6 +619,7 @@ function pickResult(index) {
   formEl('title').value = r.title;
   formEl('author').value = r.author || '';
   if (r.year) formEl('year').value = r.year;
+  if (r.month) formEl('month').value = r.month;
   if (r.isbn) formEl('isbn').value = r.isbn;
   if (r.genre && !formEl('genre').value) formEl('genre').value = r.genre;
   if (r.cover) setCover(r.cover);
@@ -682,6 +713,10 @@ async function onModalClick(e) {
         modal.close();
         renderAll();
         toast(`Hurá! Přesunuto do záložky ${TYPES[value].label}`);
+        break;
+      case 'own-too':
+        await addOwnCopy(book, value);
+        toast(`Přidáno do tvé knihovny: ${book.title}`);
         break;
     }
   } catch (err) {

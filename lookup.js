@@ -59,6 +59,7 @@ async function searchGoogleBooks(query, isbn) {
         title: v.title,
         author: (v.authors || []).join(', '),
         year: parseInt(v.publishedDate, 10) || null,
+        month: parseInt(String(v.publishedDate || '').split('-')[1], 10) || null,
         cover: cover ? cover.replace(/^http:/, 'https:').replace('&edge=curl', '') : null,
         isbn: isbn || pickIsbn(ids),
         genre: guessGenre(v.categories || []),
@@ -101,7 +102,7 @@ async function searchBooks(query) {
     const key = `${norm(r.title)}|${norm(r.author)}`;
     const existing = merged.get(key);
     if (!existing) merged.set(key, r);
-    else for (const field of ['cover', 'year', 'isbn', 'genre']) existing[field] ??= r[field];
+    else for (const field of ['cover', 'year', 'month', 'isbn', 'genre']) existing[field] ??= r[field];
   }
   return [...merged.values()].slice(0, 12);
 }
