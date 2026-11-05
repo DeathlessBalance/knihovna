@@ -5,6 +5,12 @@ const TYPES = {
   ekniha: { label: 'E-knihy', one: 'E-kniha', icon: '📱', where: 'v E-knihách' },
   wishlist: { label: 'Wishlist', one: 'Wishlist', icon: '⭐', where: 'na Wishlistu' },
 };
+// Typ „oboje“ nemá vlastní záložku – titul se zobrazuje v Knihách i v E-knihách.
+const BOTH = { label: 'Kniha i e-kniha', one: 'Kniha i e-kniha', icon: '📚📱', where: 'v Knihách i E-knihách' };
+const typeInfo = (type) => (type === 'oboje' ? BOTH : TYPES[type]) || TYPES.kniha;
+const hasType = (book, type) => book.type === type || (book.type === 'oboje' && (type === 'kniha' || type === 'ekniha'));
+// Záložka, na kterou se přepnout po uložení titulu daného typu.
+const tabFor = (type) => (type === 'oboje' ? (state.tab === 'ekniha' ? 'ekniha' : 'kniha') : type);
 const STATUSES = { neprecteno: 'Nepřečteno', ctu: 'Čtu', precteno: 'Přečteno' };
 const MONTHS = ['leden', 'únor', 'březen', 'duben', 'květen', 'červen', 'červenec', 'srpen', 'září', 'říjen', 'listopad', 'prosinec'];
 const EMPTY_MINE = {
@@ -194,7 +200,7 @@ function renderTabs() {
   const theirs = state.books.filter((b) => b.owner === state.viewing);
   $('#tabs').innerHTML = Object.entries(TYPES)
     .map(([type, t]) => {
-      const count = theirs.filter((b) => b.type === type).length;
+      const count = theirs.filter((b) => hasType(b, type)).length;
       return `<button type="button" class="tab ${type === state.tab ? 'active' : ''}" data-tab="${type}"><span class="tab-icon">${t.icon}</span> ${t.label}<span class="count">${count}</span></button>`;
     })
     .join('');
@@ -202,7 +208,7 @@ function renderTabs() {
 
 function visibleBooks() {
   const q = norm(state.query);
-  let list = state.books.filter((b) => b.owner === state.viewing && b.type === state.tab);
+  let list = state.books.filter((b) => b.owner === state.viewing && hasType(b, state.tab));
   if (q) list = list.filter((b) => norm([b.title, b.author, b.series].join(' ')).includes(q));
   if (state.genre !== 'all') list = list.filter((b) => b.genre === state.genre);
   if (state.tab !== 'wishlist' && state.status !== 'all') list = list.filter((b) => (b.status || 'neprecteno') === state.status);
@@ -328,15 +334,16 @@ function renderDetail() {
     <div class="detail">
       ${coverHtml(book, 'cover detail-cover')}
       <div>
-        <p class="kicker">${TYPES[book.type].one} · ${own ? 'moje' : esc(book.owner)}</p>
+        <p class="kicker">${typeInfo(book.type).one} · ${own ? 'moje' : esc(book.owner)}</p>
         <h2>${esc(book.title)}</h2>
         ${book.author ? `<p class="author big">${esc(book.author)}</p>` : ''}
         ${facts.length ? `<dl class="facts">${facts.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>` : ''}
         ${relationTags(book).map((t) => `<p class="note">${t}</p>`).join('')}
       </div>
     </div>
+    ${book.note ? `<section class="section"><h3>Poznámka</h3><p class="user-note">${esc(book.note)}</p></section>` : ''}
     ${book.type !== 'wishlist' ? statusSection(book, own) + ratingSection(book) : ''}
-    ${book.type === 'kniha' ? lendSection(book, own) : ''}
+    ${hasType(book, 'kniha') ? lendSection(book, own) : ''}
     ${own ? actionsSection(book) : ownTooSection(book)}`;
 }
 
@@ -387,7 +394,8 @@ function lendSection(book, own) {
 function actionsSection(book) {
   const bought = book.type === 'wishlist'
     ? `<button type="button" class="btn btn-gold" data-action="bought" data-value="kniha">📚 Koupeno jako kniha</button>
-       <button type="button" class="btn btn-gold" data-action="bought" data-value="ekniha">📱 Koupeno jako e-kniha</button>`
+       <button type="button" class="btn btn-gold" data-action="bought" data-value="ekniha">📱 Koupeno jako e-kniha</button>
+       <button type="button" class="btn btn-gold" data-action="bought" data-value="oboje">📚📱 Koupeno obojí</button>`
     : '';
   return `<div class="actions">${bought}
     <button type="button" class="btn" data-action="edit">Upravit</button>
@@ -400,16 +408,23 @@ const myCopies = (book) => state.books.filter((x) => x.owner === state.me && sam
 
 function ownTooSection(book) {
   if (book.type === 'wishlist') return '';
-  const have = myCopies(book).map((x) => x.type);
+  const copies = myCopies(book);
   const buttons = ['kniha', 'ekniha']
-    .filter((type) => !have.includes(type))
+    .filter((type) => !copies.some((x) => hasType(x, type)))
     .map((type) => `<button type="button" class="btn btn-gold" data-action="own-too" data-value="${type}">${TYPES[type].icon} Mám také – ${TYPES[type].one.toLowerCase()}</button>`);
   return buttons.length ? `<div class="actions">${buttons.join('')}</div>` : '';
 }
 
 // Titul z cizí knihovny se zkopíruje k přihlášené; když ho má na wishlistu, přesune se odtamtud.
+// Když už ho má v druhém formátu, změní se jen na „kniha i e-kniha“.
 async function addOwnCopy(book, type) {
-  const wished = myCopies(book).find((x) => x.type === 'wishlist');
+  const copies = myCopies(book);
+  const otherFormat = copies.find((x) => x.type === (type === 'kniha' ? 'ekniha' : 'kniha'));
+  if (otherFormat) {
+    await store.update(otherFormat.id, { type: 'oboje' });
+    return;
+  }
+  const wished = copies.find((x) => x.type === 'wishlist');
   if (wished) {
     await store.update(wished.id, { type, status: 'neprecteno' });
     return;
@@ -438,7 +453,7 @@ function openForm(book = null) {
   state.openId = book?.id ?? null;
   lookupResults = [];
 
-  const typeOptions = Object.fromEntries(Object.entries(TYPES).map(([k, t]) => [k, t.label]));
+  const typeOptions = { kniha: TYPES.kniha.label, ekniha: TYPES.ekniha.label, oboje: BOTH.label, wishlist: TYPES.wishlist.label };
   const genreOptions = { '': '— vyber —', ...Object.fromEntries(GENRES.map((g) => [g, g])) };
   const monthOptions = { '': '— nevím —', ...Object.fromEntries(MONTHS.map((m, i) => [i + 1, m])) };
 
@@ -473,6 +488,7 @@ function openForm(book = null) {
           <input id="cover-url" type="url" inputmode="url" value="${esc(isDataUrl(b.cover) ? '' : b.cover)}" placeholder="…nebo vlož odkaz na obrázek" aria-label="Odkaz na obálku">
         </div>
       </div>
+      ${field('Poznámka', `<textarea name="note" rows="3" placeholder="Cokoliv si chceš k titulu poznamenat…">${esc(b.note)}</textarea>`, 'full')}
       <div id="dup-warning" class="warning" hidden></div>
       <div class="form-actions">
         <button type="button" class="btn ghost" data-action="close">Zrušit</button>
@@ -504,6 +520,7 @@ function formData() {
     status: get('status'),
     cover: get('cover') || null,
     isbn: get('isbn') || null,
+    note: get('note') || null,
   };
 }
 
@@ -522,7 +539,7 @@ function duplicateMessage(data, editingId) {
   if (!data.title) return '';
   const same = state.books.filter((x) => x.id !== editingId && sameBook(x, data));
   const msgs = [];
-  const mine = unique(same.filter((x) => x.owner === state.me).map((x) => TYPES[x.type].where));
+  const mine = unique(same.filter((x) => x.owner === state.me).map((x) => typeInfo(x.type).where));
   if (mine.length) msgs.push(`Tenhle titul už máš ${mine.join(' a ')}.`);
   if (data.type === 'wishlist') {
     const owners = unique(same.filter((x) => x.owner !== state.me && x.type !== 'wishlist').map((x) => x.owner));
@@ -642,7 +659,7 @@ async function onFormSubmit(e) {
     if (editingId) await store.update(editingId, data);
     else await store.add({ ...data, owner: state.me, ratings: {}, lentTo: null, lentSince: null });
     state.viewing = state.me;
-    state.tab = data.type;
+    state.tab = tabFor(data.type);
     modal.close();
     renderAll();
     toast(editingId ? 'Uloženo' : `Přidáno: ${data.title}`);
@@ -709,10 +726,10 @@ async function onModalClick(e) {
         break;
       case 'bought':
         await store.update(book.id, { type: value, status: 'neprecteno' });
-        state.tab = value;
+        state.tab = tabFor(value);
         modal.close();
         renderAll();
-        toast(`Hurá! Přesunuto do záložky ${TYPES[value].label}`);
+        toast(value === 'oboje' ? 'Hurá! Přesunuto do Knih i E-knih' : `Hurá! Přesunuto do záložky ${TYPES[value].label}`);
         break;
       case 'own-too':
         await addOwnCopy(book, value);

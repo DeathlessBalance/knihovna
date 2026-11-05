@@ -34,7 +34,7 @@ body {
 h1, h2, h3 { font-family: var(--display); font-weight: 700; margin: 0; }
 p { margin: 0; }
 button { font: inherit; color: inherit; cursor: pointer; }
-input, select {
+input, select, textarea {
   font: inherit;
   font-size: 16px; /* menší písmo by na iPhonu zoomovalo */
   color: var(--text);
@@ -45,7 +45,9 @@ input, select {
   min-width: 0;
 }
 select option { background: var(--panel); }
-input:focus, select:focus, button:focus-visible, .card:focus-visible {
+textarea { resize: vertical; min-height: 4.5rem; }
+.user-note { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+input:focus, select:focus, textarea:focus, button:focus-visible, .card:focus-visible {
   outline: 2px solid var(--gold);
   outline-offset: 1px;
 }
